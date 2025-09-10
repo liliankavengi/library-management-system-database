@@ -1,0 +1,425 @@
+-- Drop database if exists (for development purposes)
+DROP DATABASE IF EXISTS LibraryManagementSystem;
+
+-- Create the main database
+CREATE DATABASE LibraryManagementSystem
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+-- Use the created database
+USE LibraryManagementSystem;
+
+-- ================================================================
+-- CORE ENTITY TABLES
+-- ================================================================
+
+-- Publishers Table (Referenced by Books)
+CREATE TABLE Publishers (
+    publisher_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    address TEXT,
+    phone VARCHAR(20),
+    email VARCHAR(100) UNIQUE,
+    website VARCHAR(255),
+    established_year YEAR,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Authors Table (Many-to-Many with Books)
+CREATE TABLE Authors (
+    author_id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    birth_date DATE,
+    death_date DATE,
+    nationality VARCHAR(100),
+    biography TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT chk_birth_death CHECK (death_date IS NULL OR death_date > birth_date),
+    INDEX idx_author_name (last_name, first_name)
+);
+
+-- Book Categories Table
+CREATE TABLE Categories (
+    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Books Table (Core entity with foreign key relationships)
+CREATE TABLE Books (
+    book_id INT AUTO_INCREMENT PRIMARY KEY,
+    isbn VARCHAR(17) NOT NULL UNIQUE, -- ISBN-13 format
+    title VARCHAR(500) NOT NULL,
+    subtitle VARCHAR(500),
+    publisher_id INT NOT NULL,
+    category_id INT NOT NULL,
+    publication_date DATE,
+    pages INT,
+    language VARCHAR(50) DEFAULT 'English',
+    edition INT DEFAULT 1,
+    total_copies INT NOT NULL DEFAULT 1,
+    available_copies INT NOT NULL DEFAULT 1,
+    price DECIMAL(10, 2),
+    location_shelf VARCHAR(20),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (publisher_id) REFERENCES Publishers(publisher_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES Categories(category_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    -- Check Constraints
+    CONSTRAINT chk_copies CHECK (total_copies >= available_copies AND available_copies >= 0),
+    CONSTRAINT chk_pages CHECK (pages > 0),
+    CONSTRAINT chk_edition CHECK (edition > 0),
+    CONSTRAINT chk_price CHECK (price >= 0),
+    
+    -- Indexes for performance
+    INDEX idx_isbn (isbn),
+    INDEX idx_title (title),
+    INDEX idx_publisher (publisher_id),
+    INDEX idx_category (category_id)
+);
+
+-- Many-to-Many relationship: Books and Authors
+CREATE TABLE BookAuthors (
+    book_id INT,
+    author_id INT,
+    author_type ENUM('Primary', 'Co-author', 'Editor', 'Translator') DEFAULT 'Primary',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Composite Primary Key
+    PRIMARY KEY (book_id, author_id),
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (book_id) REFERENCES Books(book_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES Authors(author_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- ================================================================
+-- MEMBER MANAGEMENT TABLES
+-- ================================================================
+
+-- Member Types (Student, Faculty, Public, etc.)
+CREATE TABLE MemberTypes (
+    type_id INT AUTO_INCREMENT PRIMARY KEY,
+    type_name VARCHAR(50) NOT NULL UNIQUE,
+    max_books_allowed INT NOT NULL DEFAULT 3,
+    loan_period_days INT NOT NULL DEFAULT 14,
+    fine_per_day DECIMAL(5, 2) NOT NULL DEFAULT 0.50,
+    description TEXT
+);
+
+-- Members Table
+CREATE TABLE Members (
+    member_id INT AUTO_INCREMENT PRIMARY KEY,
+    membership_number VARCHAR(20) NOT NULL UNIQUE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(20),
+    address TEXT,
+    date_of_birth DATE,
+    member_type_id INT NOT NULL,
+    registration_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    membership_expiry DATE NOT NULL,
+    status ENUM('Active', 'Suspended', 'Expired', 'Blocked') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (member_type_id) REFERENCES MemberTypes(type_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    -- Check Constraints
+    CONSTRAINT chk_membership_dates CHECK (membership_expiry > registration_date),
+    CONSTRAINT chk_birth_date CHECK (date_of_birth < CURRENT_DATE),
+    
+    -- Indexes
+    INDEX idx_membership_number (membership_number),
+    INDEX idx_member_email (email),
+    INDEX idx_member_name (last_name, first_name),
+    INDEX idx_member_type (member_type_id)
+);
+
+-- ================================================================
+-- STAFF MANAGEMENT TABLES
+-- ================================================================
+
+-- Staff Table
+CREATE TABLE Staff (
+    staff_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id VARCHAR(20) NOT NULL UNIQUE,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    phone VARCHAR(20),
+    hire_date DATE NOT NULL,
+    position VARCHAR(100) NOT NULL,
+    department VARCHAR(100),
+    salary DECIMAL(10, 2),
+    status ENUM('Active', 'On Leave', 'Terminated') DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT chk_salary CHECK (salary > 0),
+    
+    -- Indexes
+    INDEX idx_employee_id (employee_id),
+    INDEX idx_staff_email (email)
+);
+
+-- One-to-One relationship: Staff Profiles (Extended information)
+CREATE TABLE StaffProfiles (
+    profile_id INT AUTO_INCREMENT PRIMARY KEY,
+    staff_id INT NOT NULL UNIQUE, -- One-to-One relationship
+    address TEXT,
+    emergency_contact_name VARCHAR(200),
+    emergency_contact_phone VARCHAR(20),
+    qualifications TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraint (One-to-One)
+    FOREIGN KEY (staff_id) REFERENCES Staff(staff_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- ================================================================
+-- TRANSACTION TABLES
+-- ================================================================
+
+-- Book Loans/Checkouts
+CREATE TABLE Loans (
+    loan_id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT NOT NULL,
+    book_id INT NOT NULL,
+    staff_id INT NOT NULL, -- Staff member who processed the loan
+    loan_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    due_date DATE NOT NULL,
+    return_date DATE NULL,
+    fine_amount DECIMAL(8, 2) DEFAULT 0.00,
+    status ENUM('Active', 'Returned', 'Overdue', 'Lost') DEFAULT 'Active',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (member_id) REFERENCES Members(member_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES Books(book_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (staff_id) REFERENCES Staff(staff_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    -- Check Constraints
+    CONSTRAINT chk_loan_dates CHECK (due_date > loan_date),
+    CONSTRAINT chk_return_date CHECK (return_date IS NULL OR return_date >= loan_date),
+    CONSTRAINT chk_fine_amount CHECK (fine_amount >= 0),
+    
+    -- Indexes
+    INDEX idx_member_loans (member_id),
+    INDEX idx_book_loans (book_id),
+    INDEX idx_loan_status (status),
+    INDEX idx_due_date (due_date)
+);
+
+-- Book Reservations (Many-to-Many: Members can reserve multiple books)
+CREATE TABLE Reservations (
+    reservation_id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT NOT NULL,
+    book_id INT NOT NULL,
+    reservation_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    expiry_date DATE NOT NULL,
+    status ENUM('Active', 'Fulfilled', 'Cancelled', 'Expired') DEFAULT 'Active',
+    priority_order INT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (member_id) REFERENCES Members(member_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (book_id) REFERENCES Books(book_id) 
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    
+    -- Check Constraints
+    CONSTRAINT chk_reservation_dates CHECK (expiry_date > reservation_date),
+    CONSTRAINT chk_priority_order CHECK (priority_order > 0),
+    
+    -- Indexes
+    INDEX idx_member_reservations (member_id),
+    INDEX idx_book_reservations (book_id),
+    INDEX idx_reservation_status (status),
+    
+    -- Unique constraint: One active reservation per member per book
+    UNIQUE KEY uk_member_book_active (member_id, book_id, status)
+);
+
+-- Fine Payments
+CREATE TABLE FinePayments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id INT NOT NULL,
+    member_id INT NOT NULL,
+    staff_id INT NOT NULL, -- Staff who processed payment
+    payment_amount DECIMAL(8, 2) NOT NULL,
+    payment_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+    payment_method ENUM('Cash', 'Credit Card', 'Debit Card', 'Online', 'Cheque') NOT NULL,
+    transaction_reference VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Foreign Key Constraints
+    FOREIGN KEY (loan_id) REFERENCES Loans(loan_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES Members(member_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (staff_id) REFERENCES Staff(staff_id) 
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+    
+    -- Check Constraints
+    CONSTRAINT chk_payment_amount CHECK (payment_amount > 0),
+    
+    -- Indexes
+    INDEX idx_loan_payments (loan_id),
+    INDEX idx_member_payments (member_id),
+    INDEX idx_payment_date (payment_date)
+);
+
+-- ================================================================
+-- AUDIT AND LOGGING TABLES
+-- ================================================================
+
+-- System Activity Log
+CREATE TABLE ActivityLog (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_type ENUM('Staff', 'Member', 'System') NOT NULL,
+    user_id INT, -- Can reference staff_id or member_id
+    action VARCHAR(100) NOT NULL,
+    table_affected VARCHAR(50),
+    record_id INT,
+    old_values JSON,
+    new_values JSON,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Indexes
+    INDEX idx_user_type_id (user_type, user_id),
+    INDEX idx_action (action),
+    INDEX idx_timestamp (timestamp)
+);
+
+-- ================================================================
+-- TRIGGERS FOR BUSINESS LOGIC
+-- ================================================================
+
+-- Trigger: Update available copies when a book is loaned
+DELIMITER //
+CREATE TRIGGER tr_loan_insert_update_copies
+AFTER INSERT ON Loans
+FOR EACH ROW
+BEGIN
+    IF NEW.status = 'Active' THEN
+        UPDATE Books 
+        SET available_copies = available_copies - 1 
+        WHERE book_id = NEW.book_id;
+    END IF;
+END //
+DELIMITER ;
+
+-- Trigger: Update available copies when a book is returned
+DELIMITER //
+CREATE TRIGGER tr_loan_update_return_copies
+AFTER UPDATE ON Loans
+FOR EACH ROW
+BEGIN
+    -- If book was returned (status changed to 'Returned')
+    IF OLD.status = 'Active' AND NEW.status = 'Returned' THEN
+        UPDATE Books 
+        SET available_copies = available_copies + 1 
+        WHERE book_id = NEW.book_id;
+    END IF;
+    
+    -- If book status changed from 'Returned' back to 'Active'
+    IF OLD.status = 'Returned' AND NEW.status = 'Active' THEN
+        UPDATE Books 
+        SET available_copies = available_copies - 1 
+        WHERE book_id = NEW.book_id;
+    END IF;
+END //
+DELIMITER ;
+
+-- Insert Member Types
+INSERT INTO MemberTypes (type_name, max_books_allowed, loan_period_days, fine_per_day, description) VALUES
+('Student', 5, 14, 0.25, 'University students'),
+('Faculty', 10, 30, 0.50, 'Teaching staff and professors'),
+('Staff', 7, 21, 0.35, 'Non-teaching university staff'),
+('Public', 3, 10, 1.00, 'General public members');
+
+-- Insert Categories
+INSERT INTO Categories (name, description) VALUES
+('Fiction', 'Novels, short stories, and literary works'),
+('Non-Fiction', 'Biographies, essays, and factual books'),
+('Science', 'Scientific research and educational materials'),
+('Technology', 'Computer science, engineering, and technical books'),
+('History', 'Historical accounts and cultural studies'),
+('Arts', 'Fine arts, music, and creative works');
+
+-- Insert Publishers
+INSERT INTO Publishers (name, address, phone, email, established_year) VALUES
+('Penguin Random House', '1745 Broadway, New York, NY 10019', '+1-212-782-9000', 'info@penguinrandomhouse.com', 2013),
+('HarperCollins', '195 Broadway, New York, NY 10007', '+1-212-207-7000', 'info@harpercollins.com', 1989),
+('Simon & Schuster', '1230 Avenue of the Americas, New York, NY 10020', '+1-212-698-7000', 'info@simonandschuster.com', 1924),
+('Oxford University Press', 'Great Clarendon Street, Oxford OX2 6DP, UK', '+44-1865-556767', 'enquiry@oup.com', 1586);
+
+-- Insert Authors
+INSERT INTO Authors (first_name, last_name, birth_date, nationality, biography) VALUES
+('George', 'Orwell', '1903-06-25', 'British', 'English novelist and journalist known for dystopian fiction'),
+('Jane', 'Austen', '1775-12-16', 'British', 'English novelist known for romantic fiction'),
+('Isaac', 'Asimov', '1920-01-02', 'American', 'Science fiction writer and biochemistry professor'),
+('Agatha', 'Christie', '1890-09-15', 'British', 'Mystery novelist and playwright');
+
+-- Insert Books
+INSERT INTO Books (isbn, title, publisher_id, category_id, publication_date, pages, total_copies, available_copies, price, location_shelf) VALUES
+('978-0-452-28423-4', '1984', 1, 1, '1949-06-08', 328, 5, 5, 15.99, 'A-101'),
+('978-0-14-143951-8', 'Pride and Prejudice', 1, 1, '1813-01-28', 432, 3, 3, 12.99, 'A-205'),
+('978-0-553-29337-0', 'Foundation', 2, 1, '1951-05-01', 244, 4, 4, 14.50, 'B-150'),
+('978-0-06-207348-5', 'Murder on the Orient Express', 2, 1, '1934-01-01', 256, 2, 2, 13.75, 'C-075');
+
+-- Insert Book-Author relationships
+INSERT INTO BookAuthors (book_id, author_id, author_type) VALUES
+(1, 1, 'Primary'),
+(2, 2, 'Primary'),
+(3, 3, 'Primary'),
+(4, 4, 'Primary');
+
+-- Insert Staff
+INSERT INTO Staff (employee_id, first_name, last_name, email, phone, hire_date, position, department, salary) VALUES
+('EMP001', 'Alice', 'Johnson', 'alice.johnson@library.edu', '+1-555-0101', '2020-01-15', 'Head Librarian', 'Administration', 65000.00),
+('EMP002', 'Bob', 'Smith', 'bob.smith@library.edu', '+1-555-0102', '2021-03-20', 'Assistant Librarian', 'Circulation', 45000.00),
+('EMP003', 'Carol', 'Davis', 'carol.davis@library.edu', '+1-555-0103', '2019-09-10', 'Technical Services', 'Cataloging', 50000.00);
+
+-- Insert Staff Profiles (One-to-One relationship)
+INSERT INTO StaffProfiles (staff_id, address, emergency_contact_name, emergency_contact_phone, qualifications) VALUES
+(1, '123 Library Lane, University City, ST 12345', 'John Johnson', '+1-555-0201', 'Master of Library Science, 10 years experience'),
+(2, '456 Book Street, University City, ST 12345', 'Mary Smith', '+1-555-0202', 'Bachelor of Arts in English, Library Certification'),
+(3, '789 Catalog Court, University City, ST 12345', 'David Davis', '+1-555-0203', 'Master of Information Systems, Cataloging Specialist');
+
+-- Insert Members
+INSERT INTO Members (membership_number, first_name, last_name, email, phone, address, date_of_birth, member_type_id, membership_expiry) VALUES
+('MEM2024001', 'Emma', 'Wilson', 'emma.wilson@email.com', '+1-555-1001', '111 Student Ave, University City, ST 12345', '2000-05-15', 1, '2024-12-31'),
+('MEM2024002', 'Dr. James', 'Brown', 'j.brown@university.edu', '+1-555-1002', '222 Faculty Row, University City, ST 12345', '1975-08-22', 2, '2025-08-31'),
+('MEM2024003', 'Sarah', 'Lee', 'sarah.lee@email.com', '+1-555-1003', '333 Public St, University City, ST 12345', '1988-12-03', 4, '2024-06-30');
