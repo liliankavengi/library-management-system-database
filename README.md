@@ -1,7 +1,8 @@
 # library-management-system-database
-🎯 Real-World Use Case: Library Management System
+#🎯 Real-World Use Case: Library Management System
 This system manages a complete library operation including books, members, staff, loans, reservations, and financial transactions.
-📋 Database Schema Features:
+
+#📋 Database Schema Features:
 Well-Structured Tables (15+ tables):
 
 Core Entities: Books, Authors, Publishers, Categories
@@ -10,7 +11,7 @@ Staff Management: Staff, StaffProfiles (One-to-One relationship)
 Transactions: Loans, Reservations, FinePayments
 System: ActivityLog for auditing
 
-✅ All Required Constraints:
+#✅ All Required Constraints:
 
 PRIMARY KEY: Every table has appropriate primary keys (simple and composite)
 FOREIGN KEY: All relationships properly constrained with CASCADE/RESTRICT options
@@ -18,7 +19,7 @@ NOT NULL: Essential fields marked as required
 UNIQUE: Email addresses, ISBN numbers, membership numbers
 CHECK: Data validation for dates, amounts, quantities, logical relationships
 
-🔗 All Relationship Types:
+#🔗 All Relationship Types:
 
 One-to-One: Staff ↔ StaffProfiles (extended staff information)
 One-to-Many:
@@ -36,7 +37,7 @@ Members ↔ Books (via Reservations)
 
 
 
-🚀 Advanced Features:
+#🚀 Advanced Features:
 
 Triggers: Automatically update book availability when loans are created/returned
 Indexes: Performance optimization for common queries
@@ -44,7 +45,7 @@ Sample Data: Ready-to-use test data for all tables
 Business Logic: Enforces real-world library rules and constraints
 Audit Trail: Activity logging for system tracking
 
-💼 Business Rules Enforced:
+#💼 Business Rules Enforced:
 
 Available copies cannot exceed total copies
 Loan return dates must be logical
